@@ -1,5 +1,5 @@
 parse_git_branch() {
-	git branch 2> /dev/null | awk '{print $2}'
+	echo -n $(git branch 2> /dev/null | awk '{print $2}')
 }
 parse_git_repo() {
 	git remote get-url origin 2> /dev/null | sed -E 's/(^git@|\.git$)//g'
