@@ -21,3 +21,6 @@ cp ~/.dotfiles/.bash_aliases ~/
 
 This is meant for local/ssh use for exclusive use machines. The ssh
 agent will only start once and will be reused for future sessions.
+
+You should edit the `/etc/sudoers` file to enable carrying the git and
+ssh into root. This way you can use `git clone` etc.
