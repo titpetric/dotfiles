@@ -7,7 +7,7 @@ parse_git_repo() {
 
 color_green="\033[32m"
 color_reset="\033[00m"
-color_orange="\033[33m"
+color_orange="\033[93m"
 
 git_ps1() {
 	GBR=$(parse_git_branch)
@@ -18,7 +18,8 @@ git_ps1() {
 	if [ -z "$GREPO" ]; then
 		return
 	fi
-	echo -e " ${color_orange}${GREPO/:/\/}${color_reset} (${color_green}$GBR${color_reset})"
+	# echo -e " ${color_orange}${GREPO/:/\/}${color_reset} (${color_green}$GBR${color_reset})"
+	echo -e " (${color_orange}$GBR${color_reset})"
 }
 
 export PS1="\[\033[01;32m\]\u@\h${color_reset}:\[\033[32m\]\w${color_reset}\$(git_ps1) $ "
