@@ -1,48 +1,58 @@
 #!/bin/bash
-#
-# Tit Petric <black@titpetric.com> / Tue 07 May 2013 01:35:01 PM CEST
-#
 
-function git_status_folder
-{
-	dir=${1}
-	cd ${dir}
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
-	OIFS=${IFS}
-	NIFS=$'\n'
-
-	IFS=${NIFS}
-
-	GITSTATUS=`git status | grep 'is ahead' ; git status --porcelain`
-	if [ -n "$GITSTATUS" ]; then
-		echo \# ${dir}
-		for CHANGE in $GITSTATUS
-		do
-			IFS=${OIFS}
-			echo $CHANGE
-			IFS=${NIFS}
-		done
-	fi
-
-	IFS=$OIFS
-	cd ${ORIGPWD}
-}
-
-ORIGPWD=${PWD}
-REPOS=`find -type d -name '.git' | sed 's/\/\.git//g'`
-for REPO in $REPOS
-do
-	if [ "$REPO" == "." ]; then
-		continue;
-	fi
-	git_status_folder "$REPO"
+# Find all .git directories, excluding vendor and node_modules
+find . -type d -name .git \
+  -not -path '*/vendor/*' \
+  -not -path '*/node_modules/*' | while read git_dir; do
+  
+  repo_dir=$(dirname "$git_dir")
+  
+  # Get relative path for display
+  display_path=${repo_dir#./}
+  [ "$display_path" = "." ] && display_path="."
+  
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${CYAN}Repository: ${BLUE}$display_path${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  
+  cd "$repo_dir" || exit
+  
+  # Check for unpushed commits
+  unpushed=$(git rev-list @{u}.. 2>/dev/null | wc -l)
+  if [ "$unpushed" -gt 0 ]; then
+    echo -e "${RED}⚠ Unpushed commits: $unpushed${NC}"
+  fi
+  
+  # Get git status
+  status=$(git status --porcelain)
+  
+  if [ -z "$status" ]; then
+    echo -e "${GREEN}✓ Clean${NC}"
+  else
+    echo -e "${YELLOW}Modified/Untracked files:${NC}"
+    echo "$status" | while IFS= read -r line; do
+      status_code="${line:0:2}"
+      filename="${line:3}"
+      
+      case "$status_code" in
+        "M ") echo -e "  ${YELLOW}M${NC}  $filename" ;;  # Modified
+        "A ") echo -e "  ${GREEN}A${NC}  $filename" ;;  # Added
+        "D ") echo -e "  ${RED}D${NC}  $filename" ;;  # Deleted
+        "??") echo -e "  ${RED}?${NC}  $filename" ;;  # Untracked
+        *" M") echo -e "  ${YELLOW}${status_code}${NC} $filename" ;; # Staged modified
+        *) echo -e "  ${YELLOW}${status_code}${NC} $filename" ;;
+      esac
+    done
+  fi
+  
+  cd - > /dev/null
+  echo ""
 done
-
-GITDIR=`git rev-parse --git-dir 2>&1`
-if [ $? -eq 0 ]; then
-	REPOPATH=`echo $GITDIR | sed 's/\/\?\.git$//'`
-	if [ -z "$REPOPATH" ]; then
-		REPOPATH=$ORIGPWD;
-	fi
-	git_status_folder "$REPOPATH";
-fi
