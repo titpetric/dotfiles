@@ -1,0 +1,1 @@
+ps -eo rss,comm --no-headers | awk '{ mem[$2] += $1 } END { for (c in mem) printf "%10.1f MB  %s\n", mem[c]/1024, c }' | sort -nr | head -n 10

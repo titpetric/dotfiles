@@ -1,58 +1,49 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# git-st — the ultimate clean/dirty multi-repo status viewer
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[1;33m' BLUE='\033[0;34m' CYAN='\033[0;36m' NC='\033[0m'
 
-# Find all .git directories, excluding vendor and node_modules
-find . -type d -name .git \
-  -not -path '*/vendor/*' \
-  -not -path '*/node_modules/*' | while read git_dir; do
-  
-  repo_dir=$(dirname "$git_dir")
-  
-  # Get relative path for display
-  display_path=${repo_dir#./}
-  [ "$display_path" = "." ] && display_path="."
-  
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "${CYAN}Repository: ${BLUE}$display_path${NC}"
-  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  
-  cd "$repo_dir" || exit
-  
-  # Check for unpushed commits
-  unpushed=$(git rev-list @{u}.. 2>/dev/null | wc -l)
-  if [ "$unpushed" -gt 0 ]; then
-    echo -e "${RED}⚠ Unpushed commits: $unpushed${NC}"
-  fi
-  
-  # Get git status
-  status=$(git status --porcelain)
-  
-  if [ -z "$status" ]; then
-    echo -e "${GREEN}✓ Clean${NC}"
+check_repo() {
+  local dir="$1"
+  local name="${dir#./}"
+  [[ "$name" == "." ]] && name="."
+
+  printf "${CYAN}Repository:${NC} ${BLUE}%s${NC}" "$name"
+  cd "$dir" || return
+
+  # Count unpushed commits (silently fail if no upstream)
+  unpushed=$(git rev-list --count @{u}.. 2>/dev/null || echo 0)
+
+  # Use only --porcelain=v1 for reliable empty check
+  changes=$(git status --porcelain=v1)
+
+  if (( unpushed == 0 )) && [[ -z "$changes" ]]; then
+    printf "  ${GREEN}Clean${NC}\n"
   else
-    echo -e "${YELLOW}Modified/Untracked files:${NC}"
-    echo "$status" | while IFS= read -r line; do
-      status_code="${line:0:2}"
-      filename="${line:3}"
-      
-      case "$status_code" in
-        "M ") echo -e "  ${YELLOW}M${NC}  $filename" ;;  # Modified
-        "A ") echo -e "  ${GREEN}A${NC}  $filename" ;;  # Added
-        "D ") echo -e "  ${RED}D${NC}  $filename" ;;  # Deleted
-        "??") echo -e "  ${RED}?${NC}  $filename" ;;  # Untracked
-        *" M") echo -e "  ${YELLOW}${status_code}${NC} $filename" ;; # Staged modified
-        *) echo -e "  ${YELLOW}${status_code}${NC} $filename" ;;
-      esac
-    done
+    (( unpushed > 0 )) && printf "  ${RED}Unpushed: %d${NC}\n" "$unpushed"
+    [[ -n "$changes" ]] && {
+      printf "  ${YELLOW}Changes:${NC}\n"
+      printf "%b\n" "$changes" | while IFS= read -r line; do
+        code="${line:0:2}" file="${line:3}"
+        case "$code" in
+          "M ")  printf "    ${YELLOW}M${NC} %s\n" "$file" ;;
+          "A ")  printf "    ${GREEN}A${NC} %s\n" "$file" ;;
+          "D ")  printf "    ${RED}D${NC} %s\n" "$file" ;;
+          "R ")  printf "    ${YELLOW}R${NC} %s\n" "$file" ;;
+          "C ")  printf "    ${GREEN}C${NC} %s\n" "$file" ;;
+          "??" ) printf "    ${RED}?${NC} %s\n" "$file" ;;
+          *)     printf "    ${YELLOW}%s${NC} %s\n" "$code" "$file" ;;
+        esac
+      done
+    }
   fi
-  
-  cd - > /dev/null
-  echo ""
-done
+}
+
+export -f check_repo
+export RED GREEN YELLOW BLUE CYAN NC
+
+# Fast, parallel, correct path handling
+find . \( -path '*/vendor/*' -o -path '*/node_modules/*' -o -path '*/.git/*' \) -prune -o \
+  -type d -name '.git' -print 2>/dev/null |
+  xargs -n1 -P12 dirname |
+  xargs -I{} bash -c 'check_repo "{}"'
