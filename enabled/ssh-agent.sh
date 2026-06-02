@@ -2,13 +2,16 @@
 if [ "$USER" == "root" ]; then
 	return
 fi
+
+SOCKETFILE="/tmp/ssh_auth_sock_$USER"
+
 # start ssh-agent if not already started
-if [ ! -S ~/.ssh/ssh_auth_sock ]; then
+if [ ! -f "$SOCKETFILE" ]; then
 	eval `ssh-agent`
-	ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
+	ln -sf "$SSH_AUTH_SOCK" $SOCKETFILE
 	# add the local users identity
 	ssh-add
 fi
-export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
+export SSH_AUTH_SOCK=$SOCKETFILE
 # print added identity
 ssh-add -l
